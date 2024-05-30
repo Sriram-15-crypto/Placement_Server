@@ -1,0 +1,10 @@
+{
+  "MONGOURI": "mongodb+srv://roobankr5:Xu5zUtZKL3NU8BR9@rooban.lomnlyw.mongodb.net/",
+  "JWT_TOKEN_KEY": "KJ9BK0DF098353NF09E230RH2039RH",
+  "BASE_URL": "http://localhost:3000",
+  "CLIENT_URL":"http://localhost:3535",
+  "emailConfig": {
+    "user": "roobankr6@gmail.com",
+    "pass": "pfdwevxunzujxcmy"
+  }
+}
