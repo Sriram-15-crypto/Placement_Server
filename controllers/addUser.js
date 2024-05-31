@@ -259,7 +259,7 @@ module.exports.UserSignIn = async (req, res) => {
       
           let token = createSecretToken(user._id);
       
-          let resetPasswordUrl = `${BASE_URL}/ResetPassword/${user._id}/${token}`;
+          let resetPasswordUrl = `${BASE_URL}/users/ResetPassword/${user._id}/${token}`;
       
           let emailBody = `Greetings,
           <br/>
@@ -271,7 +271,7 @@ module.exports.UserSignIn = async (req, res) => {
           <br/>
           Regards,
           <i>Medical Tourism Team</i>`;
-      
+
           let receiverEmail = user.email;
           let emailSubject = "Reset Password - Medical Tourism";
       
@@ -300,73 +300,235 @@ module.exports.UserSignIn = async (req, res) => {
           });
         }
       };
-      
-      // For verifying reset password link for FORGOT PASSWORD SCENARIO ONLY
-      module.exports.UserVerifyResetPasswordLink = async (req, res) => {
-        try {
-          const user = await User_Access.findOne({ _id: req.params.id });
-          if (!user)
-            return res
-              .status(400)
-              .json({ message: [{ key: "error", value: "Invalid link" }] });
-      
-          const token = req.params.token;
-      
-          if (!token)
-            return res
-              .status(400)
-              .json({ message: [{ key: "error", value: "Invalid link" }] });
-      
-          jwt.verify(token, JWT_TOKEN_KEY, async (err, data) => {
-            if (err) {
+    
+    // For verifying reset password link for FORGOT PASSWORD SCENARIO ONLY
+    module.exports.UserVerifyResetPasswordLink = async (req, res) => {
+      try {
+        const user = await User_Access.findOne({ _id: req.params.id });
+        if (!user)
+          return res
+            .status(400)
+            .json({ message: [{ key: "error", value: "Invalid link" }] });
+    
+        const token = req.params.token;
+    
+        if (!token)
+          return res
+            .status(400)
+            .json({ message: [{ key: "error", value: "Invalid link" }] });
+    
+        jwt.verify(token, JWT_TOKEN_KEY, async (err, data) => {
+          if (err) {
+            return res.status(400).json({
+              message: [{ key: "error", value: "Invalid link" }],
+            });
+          } else {
+            if (data.id === req.params.id) {
+              return res
+                .status(200)
+                .json({ message: [{ key: "success", value: "valid url" }] });
+            } else {
               return res.status(400).json({
                 message: [{ key: "error", value: "Invalid link" }],
               });
-            } else {
-              if (data.id === req.params.id) {
-                return res
-                  .status(200)
-                  .json({ message: [{ key: "success", value: "valid url" }] });
-              } else {
-                return res.status(400).json({
-                  message: [{ key: "error", value: "Invalid link" }],
+            }
+          }
+        });
+      } catch (error) {
+        res
+          .status(500)
+          .json({ message: [{ key: "error", value: "Internal Server Error" }] });
+          console.log("error",error);
+      }
+    };
+    
+    // For resetting password link FOR FORGOT PASSWORD SCENARIO ONLY
+    module.exports.UserForgotPasswordResetPassword = async (req, res) => {
+      try {
+        // password and id are being received here through body only
+        const password = req.body.password;
+        const user = await User_Access.findOne({ _id: req.body.id });
+        if (!user) {
+          return res
+            .status(400)
+            .send({ message: [{ key: "error", value: "Invalid link" }] });
+        }
+    
+    
+        user.password = password;
+        await user.save();
+        res.status(200).json({
+          message: [{ key: "success", value: "Password reset successfully" }],
+        });
+      
+      } catch (error) {
+        console.log(error);
+        return res
+          .status(500)
+          .json({ message: [{ key: "error", value: "Internal Server Error" }] });
+      }
+    };
+    
+    
+
+
+    module.exports.updateUserAccess = async (req, res) => {
+      try {
+        const userId = req.params.userId;
+        const updates = req.body;
+        const imageFile = req.files?.image;
+    
+        const existingUserAccess = await User_Access.findById(userId);
+    
+        if (!existingUserAccess) {
+          return res.status(404).json({
+            message: [{ key: "Error", value: "User Not Found" }],user:updatedUserAccess,
+          });
+        }
+    
+        // Handle the image update
+        if (imageFile) {
+          if (existingUserAccess.image) {
+            try {
+              const imageUrlParts = existingUserAccess.image.split('/');
+              const imageName = imageUrlParts[imageUrlParts.length - 1];
+    
+              const { error: removeError } = await supabase.storage
+                .from('Placement')
+                .remove([`access_user/profile/${imageName}`]);
+    
+              if (removeError) {
+                console.error('Error removing existing image from Supabase:', removeError);
+                return res.status(500).json({
+                  message: [{ key: "error", value: "Error removing existing image from Supabase storage" }]
                 });
               }
+            } catch (error) {
+              console.error('Error in removing image:', error);
+              return res.status(500).json({
+                message: [{ key: "error", value: "Error removing existing image from Supabase storage" }]
+              });
             }
-          });
-        } catch (error) {
-          res
-            .status(500)
-            .json({ message: [{ key: "error", value: "Internal Server Error" }] });
-            console.log("error",error);
-        }
-      };
-      
-      // For resetting password link FOR FORGOT PASSWORD SCENARIO ONLY
-      module.exports.UserForgotPasswordResetPassword = async (req, res) => {
-        try {
-          // password and id are being received here through body only
-          const password = req.body.password;
-          const user = await User_Access.findOne({ _id: req.body.id });
-          if (!user) {
-            return res
-              .status(400)
-              .send({ message: [{ key: "error", value: "Invalid link" }] });
           }
-      
-      
-          user.password = password;
-          await user.save();
-          res.status(200).json({
-            message: [{ key: "success", value: "Password reset successfully" }],
-          });
-        
-        } catch (error) {
-          console.log(error);
-          return res
-            .status(500)
-            .json({ message: [{ key: "error", value: "Internal Server Error" }] });
+    
+          const uniqueFileName = `${Date.now()}_${imageFile.name}`;
+    
+          const { data, error: uploadError } = await supabase.storage
+            .from("Placement/access_user/profile")
+            .upload(uniqueFileName, imageFile.data);
+    
+          if (uploadError) {
+            console.error('Error uploading new image to Supabase:', uploadError);
+            return res.status(500).json({
+              message: [{ key: "error", value: "Error uploading image to Supabase" }]
+            });
+          }
+    
+          const imageUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/Placement/access_user/profile/${uniqueFileName}`;
+          updates.image = imageUrl;
         }
-      };
-      
-      
+    
+        // Ensure address and access fields are properly parsed
+        if (updates.address) {
+          try {
+            updates.address = JSON.parse(updates.address);
+          } catch (error) {
+            return res.status(400).json({
+              message: [{ key: 'error', value: 'Invalid address format' }]
+            });
+          }
+        }
+    
+        if (updates.access) {
+          try {
+            updates.access = JSON.parse(updates.access);
+          } catch (error) {
+            return res.status(400).json({
+              message: [{ key: 'error', value: 'Invalid access format' }]
+            });
+          }
+        }
+    
+        // Update user access details
+        const updatedUserAccess = await User_Access.findByIdAndUpdate(userId, updates, {
+          new: true,
+          runValidators: true,
+        });
+    
+        if (!updatedUserAccess) {
+          return res.status(404).json({
+            message: [{ key: "Error", value: "User Not Found" }],
+          });
+        }
+    
+       return res.status(200).json({
+          message: [{ key: "success", value: "user Updated Successfully" }],user:updatedUserAccess,
+        });
+      } catch (error) {
+        const errors = [];
+        for (let key in error.errors) {
+          errors.push({
+            key,
+            value: error.errors[key].message,
+          });
+        }
+        res.status(400).json({ message: errors });
+        console.error('Error updating user access:', error);
+      }
+    };
+    
+
+    module.exports.deleteUserAccess = async (req, res) => {
+      try {
+        const userId = req.params.userId;
+    
+        const existingUserAccess = await User_Access.findById(userId);
+    
+        if (!existingUserAccess) {
+          return res.status(404).json({
+            message: [{ key: "Error", value: "User Not Found" }],
+          });;
+        }
+    
+        // Handle image deletion
+        if (existingUserAccess.image) {
+          try {
+            const imageUrlParts = existingUserAccess.image.split('/');
+            const imageName = imageUrlParts[imageUrlParts.length - 1];
+    
+            const { error: removeError } = await supabase.storage
+              .from('Placement')
+              .remove([`access_user/profile/${imageName}`]);
+    
+            if (removeError) {
+              console.error('Error removing image from Supabase:', removeError);
+              return res.status(500).json({
+                message: [{ key: "error", value: "Error removing image from Supabase storage" }]
+              });
+            }
+          } catch (error) {
+            console.error('Error in removing image:', error);
+            return res.status(500).json({
+              message: [{ key: "error", value: "Error removing image from Supabase storage" }]
+            });
+          }
+        }
+    
+        // Delete user from the database
+        await User_Access.findByIdAndDelete(userId);
+        res.status(200).json({
+          message: [{ key: "success", value: "User deleted successfully" }],
+        });
+      } catch (error) {
+        const errors = [];
+        for (let key in error.errors) {
+          errors.push({
+            key,
+            value: error.errors[key].message,
+          });
+        }
+        res.status(400).json({ message: errors });
+        console.error('Error deleting user:', error);
+      }
+    };
+    
